@@ -1,0 +1,222 @@
+## Working of Magento Install and Upgrade Data Script ##
+
+While developing a custom module in Magento, many times I have to deal with install and upgrade script issues. Sometimes, my install script didn't work or my upgrade script didn't work.
+
+Normally, this type of issues arise because of mistakes in the naming convention, improper version number, or incorrect syntax. As a Magento developer someone might face this type of issues. To overcome and smoothly run install and upgrade script flow in future need, I decided to grab your attention and give well focus on how to write infallible Magento install and upgrade script.
+
+A Magento install and upgrade script is a part of module development, thus it’s recommended that you have some understanding of module development prior to this article.
+
+Whenever you install or create any new module that contains database interaction, you will find an install and upgrade script in module code directory that will run once you hit your URL. Magento core modules also follows the same install and upgrade structure. If you want to see some examples open location ***app/code/core/Mage/Catalog/sql/ catalog_setup***. Here you find several install and upgrade script with proper naming convention along with their version number. Let's going dip into each script by taking some examples and working flow.
+
+Install Script
+-------
+To run install script, we need to create a custom module. We are not going to create whole new module as its beyond the scope of this article, rather we assume that we have a already created  [custom module](https://www.google.com/#q=magento+custom+module+development) with package name **Sitepoint** and module name **Articles** which keep records of all written articles in database.
+
+For a quick guide let's define the basic module components right here
+
+ - **Blocks:** Class instance of frontend templates. Frontend templates directly use class functions.
+ - **Models:** Contains business logic same as typical MVC pattern.
+ - **Resource Models:** Push and Pull data from database tables.
+ - **Controllers:** Load layouts blocks when a URL is hitted.
+ - **etc:** An XML file contains module related configurations.
+ - **Helpers:** As name suggest, A Class contains functions which can be accessible across all modules as a helper, regardless of module scope.
+ - **sql:** A file contains database upgrade and install script to create and update database schema.
+
+Directory structure of module should be same as shown below.
+
+app
+ --code
+ ---local
+ ----Sitepoint
+ ------Articles
+ --------Block
+  --------controllers
+   --------etc
+    --------Model
+     --------sql
+		
+Go to **app/code/local/Sitepoint/Articles/etc** and open a file **config.xml**. We need to add some configuration related to install script location in this file which tell Magento about our install script location. In **config.xml** file under ***global*** tag add below child tags.
+
+    <global>
+    <models>
+        <articles>
+            <class>Sitepoint_Articles_Model</class> <!-- Model class files -->
+            <resourceModel>articles_mysql4</resourceModel> <!--Resource model -->
+        </articles>
+        <articles_mysql4>
+            <class>Sitepoint_Articles_Model_Mysql4</class>
+            <entities>
+                <articles>
+                    <table>articles</table>  <!-- Db table name  -->
+                </articles>
+            </entities>
+        </articles_mysql4>
+    </models>
+    <resources>  
+        <articles_setup>
+            <setup>
+                <module>Sitepoint_Articles</module>
+            </setup>
+            <connection>
+                <use>core_setup</use>
+            </connection>
+        </articles_setup>
+        <articles_write>
+            <connection>
+                <use>core_write</use>
+            </connection>
+        </articles_write>
+        <articles_read>
+            <connection>
+                <use>core_read</use>
+            </connection>
+        </articles_read>
+    </resources>
+
+Here There's a very important tag ***articles_setup*** and it's located under the ***resources*** tag, which tells Magento that our database setup files reside under the **articles_setup** directory.
+
+Go to **Articles/sql/articles_setup** and create install script mysql4-install-0.1.0.php 
+
+    <?php
+    $installer = $this;
+    $installer->startSetup();
+    $installer->run("
+    -- DROP TABLE IF EXISTS {$this->getTable('articles')};
+	CREATE TABLE {$this->getTable('articles')} (
+	  `articles_id` int(11) unsigned NOT NULL auto_increment,
+	  `title` varchar(255) NOT NULL default '',
+	  `short_desc` text NOT NULL default '',
+	  `long_desc` text NOT NULL default '',
+	  `status` tinyint(2) NOT NULL default '0',
+	  `created_time` datetime NULL,
+	  `update_time` datetime NULL,
+	  PRIMARY KEY (`articles_id`)
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+	");
+	$installer->endSetup();
+	?>
+To make our script compatible across databases, here is the alternate way using a DDL object:
+
+    <?php
+    $installer = $this;
+	$installer->startSetup();
+	$table = $installer->getConnection()->newTable($installer->getTable('articles'))
+    ->addColumn('articles_id', Varien_Db_Ddl_Table::TYPE_INTEGER, 11, array(
+        'unsigned' => true,
+        'nullable' => false,
+        'primary' => true,
+        'identity' => true,
+        ), 'Article ID')
+    ->addColumn('title', Varien_Db_Ddl_Table::TYPE_VARCHAR, 255, array(
+        'nullable' => false,
+        'default' => '', 
+        ), 'Title')
+    ->addColumn('short_desc', Varien_Db_Ddl_Table::TYPE_TEXT, null, array(
+        'nullable' => false,
+        'default' => '',
+        ), 'Short Desc')
+    ->addColumn('long_desc', Varien_Db_Ddl_Table::TYPE_TEXT, null, array(
+        'nullable' => false,
+        'default' => '',
+        ), 'Long Desc')
+    ->addColumn('status', Varien_Db_Ddl_Table::TYPE_TINYINT, 2, array(
+        'nullable' => false,
+        'default' => '0',
+        ), 'Status')
+    ->addColumn('created_time', Varien_Db_Ddl_Table::TYPE_DATE, null, array(
+        'nullable' => true,
+        'default' => null,
+        ), 'Created Date')
+    ->addColumn('update_time', Varien_Db_Ddl_Table::TYPE_DATE, null, array(
+        'nullable' => true,
+        'default' => null,
+        ), 'Update Date')    
+    ->setComment('Articles table');
+	$installer->getConnection()->createTable($table);
+	$installer->endSetup();
+    ?>
+To get the table name, we use **$this->getTable('articles')** as it will automatically append table prefix (configured during the Magento installation process) to the table name.
+
+The name of our install script is followed by some version number. This number is same as defined in **config.xml** file.
+
+    <modules>
+    <Sitepoint_Articles>
+        <version>0.1.0</version>    <!-- Version of module -->
+    </Sitepoint_Articles>
+	</modules>
+
+The version number tells Magento about latest install script. After setting up the install script, refresh your Magento URL and look at the database. If your install script ran successfully, your table should be created.
+
+Now goto your SQL editor and open the **core_resource** table. Here, you can see the entry of your install script with the name **articles_setup** and version number 0.1.0.
+
+Every time you refresh a URL, Magento checks for any install scripts to run based on the version number in your config file and in the database **core_resource** table. If the versions do not match, it will look for the appropriate version file to run. Suppose you change the version to 0.1.1 in your **config.xml**, then Magento will find that your **core_resource** table contains version number 0.1.0 and you have mentioned new version, so it will look for script with version number 0.1.1.  
+
+If it finds this file inside the **articles_setup** directory, it will run it and upgrade the version number to 0.1.1 in the **core_resource** table. This is how an install and upgrade script works. This version system is followed by all Magento core modules. In fact, the entire Magento upgrade process follows this same procedure.
+
+Note that the install script runs only once - when you create it and refresh your URL. If you want to alter the database schema you can do it by using upgrade script. A shortcut trick is delete your setup entry from **core_resource** table and refresh your URL. The script will run again and your new changes are reflected in the database table.
+
+
+Upgrade Script
+--------------
+
+When you want to update your module in terms of a new database fields to provide new functionality, you need to alter your schema, change fields datatype, introduce new columns, and so on.
+
+This is when the upgrade script comes in to the picture. You can not directly make any changes via an SQL editor by running row queries because whenever another user installs your module, that new database change will not work in their setup. Fundamentally, it's Magento's recommendation to use an upgrade script for altering the database schema.
+
+An upgrade script is similar to an install script - the only change is the name and a different version number. Let's look at an example.
+
+Suppose we want to add one more column and to change one column. To do this, we will create one upgrade script named mysql4-upgrade-0.1.0-0.1.1.php under **Articles/sql/articles_setup.** Add the following code snippet.
+
+    <?php
+	$installer = $this;
+	$installer->startSetup();
+	$installer->run("
+	ALTER TABLE {$this->getTable('articles')}
+	CHANGE COLUMN `long_desc` `long_desc` text NULL,
+	ADD COLUMN `sub_title` VARCHAR(45) NOT NULL AFTER `title`;
+	");
+	$installer->endSetup();
+	?>
+
+Here's an alternative way of doing this using DDL:
+
+    <?php 
+    $installer = $this;
+	$installer->startSetup();
+	$installer->getConnection()
+    ->changeColumn($installer->getTable('articles'), 'long_desc', 'long_desc', array(
+        'type' => Varien_Db_Ddl_Table::TYPE_TEXT,
+        'nullable' => true,
+        
+    )
+    ->addColumn($installer->getTable('articles'), 'sub_title', array(
+        'type' => Varien_Db_Ddl_Table::TYPE_VARCHAR,
+        'nullable' => false,
+        'comment' => 'Sub title'
+    )
+	);
+	$installer->endSetup();
+	?>
+
+
+Now we need to tell Magento that we have a new upgrade script ready. To do this, we need to change the version number in our config.xml file :
+
+    <modules>
+    <Sitepoint_Articles>
+        <version>0.1.1</version>    <!-- Upgrade Version of module -->
+    </Sitepoint_Articles>
+</modules>
+
+Once you refresh your URL, Magento will find that your **config.xml** file contains a higher version than the version stored in the **core_resource** table. So, it will look for an upgrade script of same version and then run it. After refreshing your URL, you should be able to see the update to your database schema. 
+
+Conclusion
+=======
+
+This is how the Magento Install and Upgrade scripts work. You can give it a try by creating a new module and running the script. If you have any trouble while developing your install or upgrade script, feel free to mention it in comment section and we'll discuss it.
+
+
+
+	
+    
+
+ 
