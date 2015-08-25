@@ -1,6 +1,6 @@
 ## Working of Magento Install and Upgrade Data Script ##
 
-While developing a custom module in Magento, many times I have to deal with install and upgrade script issues. Sometimes, my install script didn't work or my upgrade script didn't work.
+Test While developing a custom module in Magento, many times I have to deal with install and upgrade script issues. Sometimes, my install script didn't work or my upgrade script didn't work.
 
 Normally, this type of issues arise because of mistakes in the naming convention, improper version number, or incorrect syntax. As a Magento developer someone might face this type of issues. To overcome and smoothly run install and upgrade script flow in future need, I decided to grab your attention and give well focus on how to write infallible Magento install and upgrade script.
 
